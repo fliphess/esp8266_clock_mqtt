@@ -1,2 +1,4 @@
 # esp8266_clock
-A esp8266 nodemcu controlling a 7 segment led display clock
+
+A basic digital clock that retrieves the date from NTP, containing an mqtt snooze button.
+
