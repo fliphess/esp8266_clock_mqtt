@@ -52,7 +52,6 @@ char ntp_server1[40] = "0.nl.pool.ntp.org";
 char ntp_server2[40] = "1.nl.pool.ntp.org";
 char ntp_server3[40] = "2.nl.pool.ntp.org";
 
-// -------------- Configuration options -----------------
 
 // * Update time from NTP server every 2 hours
 #define NTP_UPDATE_INTERVAL_SEC 2 * 3600
@@ -63,4 +62,14 @@ char ntp_server3[40] = "2.nl.pool.ntp.org";
 struct dstRule StartRule = {"CEST", Last, Sun, Mar, 2, 3600};       // Daylight time = UTC/GMT +2 hours
 struct dstRule EndRule   = {"CET",  Last, Sun, Oct, 2, 0};          // Standard time = UTC/GMT +1 hour
 
+// * The current reading from the input pin
+int button_state;
 
+// * The previous reading from the input pin
+int last_button_state = MQTT_BUTTON_OFF;
+
+// * The last time the output pin was toggled
+unsigned long last_bounce_time = 0;
+
+// * The debounce time; increase if the output flickers
+unsigned long debounce_delay   = 50;

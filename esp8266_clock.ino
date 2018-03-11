@@ -29,7 +29,7 @@ int32_t tick;
 simpleDSTadjust dstAdjusted(StartRule, EndRule);
 
 // * Initiate HTTP server
-Adafruit_7segment matrix = Adafruit_7segment();
+Adafruit_7segment clock_display = Adafruit_7segment();
 
 // * Initiate WIFI client
 WiFiClient espClient;
@@ -111,11 +111,20 @@ void update_clock_display() {
     time_t t = dstAdjusted.time(&dstAbbrev);
     struct tm *timeinfo = localtime (&t);
 
-    float tmpTime = (timeinfo->tm_hour * 100) + timeinfo->tm_min;
+    int display_value = (timeinfo->tm_hour * 100) + timeinfo->tm_min;
 
-    matrix.print(tmpTime);
-    matrix.drawColon(true);
-    matrix.writeDisplay();
+    clock_display.print(display_value, DEC);
+    clock_display.drawColon(true);
+
+    if (timeinfo->tm_hour == 0) {
+        clock_display.writeDigitNum(1, 0);
+
+        if (timeinfo->tm_min < 10) {
+            clock_display.writeDigitNum(3, 0);
+        }
+    }
+
+    clock_display.writeDisplay();
 
 }   // * end update_clock_display()
 
@@ -209,14 +218,6 @@ bool mqtt_reconnect() {
 
 }   // * end mqtt_reconnect()
 
-
-int button_state;                        // the current reading from the input pin
-int last_button_state = MQTT_BUTTON_OFF;  // the previous reading from the input pin
-
-unsigned long last_bounce_time = 0;     // the last time the output pin was toggled
-unsigned long debounce_delay    = 50;    // the debounce time; increase if the output flickers
-
-
 void send_update_to_broker() {
     const char* output = (button_state == MQTT_BUTTON_ON) ? MQTT_ON_MESSAGE : MQTT_OFF_MESSAGE;
 
@@ -227,7 +228,6 @@ void send_update_to_broker() {
         Serial.println(F("Failed to publish state to broker"));
     }
 }
-
 
 // * Check if the button state changed and send to MQTT broker
 void button_loop() {
@@ -361,12 +361,12 @@ void setup(){
     // * Configure Serial and EEPROM
     Serial.begin(115200);
     EEPROM.begin(512);
-    matrix.begin(0x70);
+    clock_display.begin(0x70);
 
     // * Set led pin as output
     pinMode(BUILTIN_LED, OUTPUT);
 
-    // * Set button pin to input pulldown
+    // * Set button pin to input pullup
     pinMode(BUTTON_PIN, INPUT_PULLUP);
 
     // * Start ticker with 0.5 because we start in AP mode and try to connect
@@ -476,19 +476,12 @@ void setup(){
 void loop() {
     ArduinoOTA.handle();
 
-    // * Update NTP when needed
-    if (ntp_ready_for_update) {
-        get_time_from_ntp_servers();
-        ntp_ready_for_update = false;
-    }
-
     // * Maintain MQTT connection
     if (!mqtt_client.connected()) {
         long now = millis();
 
         if (now - LAST_RECONNECT_ATTEMPT > 5000) {
             LAST_RECONNECT_ATTEMPT = now;
-
             if (mqtt_reconnect()) {
                 LAST_RECONNECT_ATTEMPT = 0;
             }
@@ -496,6 +489,12 @@ void loop() {
     }
     else {
         mqtt_client.loop();
+    }
+
+    // * Update NTP when needed
+    if (ntp_ready_for_update) {
+        get_time_from_ntp_servers();
+        ntp_ready_for_update = false;
     }
 
     button_loop();
