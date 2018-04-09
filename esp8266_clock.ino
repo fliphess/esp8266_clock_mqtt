@@ -19,6 +19,9 @@
 // * Include the PubSubClient after setting mqtt packet size in settings.h
 #include <PubSubClient.h>
 
+// Initiate the watchdog ticker
+Ticker tickerOSWatch;
+
 // * Initiate led blinker library
 Ticker ticker;
 
@@ -39,6 +42,21 @@ PubSubClient mqtt_client(espClient);
 
 
 // **********************************
+// * Watchdog                       *
+// **********************************
+
+void ICACHE_RAM_ATTR osWatch(void)
+{
+    unsigned long t = millis();
+    unsigned long last_run = abs(t - last_loop);
+    if(last_run >= (OSWATCH_RESET_TIME * 1000)) {
+      // save the hit here to eeprom or to rtc memory if needed
+        ESP.restart();  // normal reboot
+        //ESP.reset();  // hard reset
+    }
+}
+
+// **********************************
 // * Time & NTP                     *
 // **********************************
 
@@ -46,7 +64,8 @@ PubSubClient mqtt_client(espClient);
 bool ntp_ready_for_update = false;
 
 // * NTP timer update ticker
-void seconds_ticker() {
+void seconds_ticker()
+{
     tick--;
 
     if (tick <= 0) {
@@ -61,7 +80,8 @@ void seconds_ticker() {
 }   // * end seconds_ticker()
 
 
-void get_time_from_ntp_servers() {
+void get_time_from_ntp_servers()
+{
     bool update_time_ok = false;
     int cnt = 10;
 
@@ -93,7 +113,8 @@ void get_time_from_ntp_servers() {
 }   // * end get_time_from_ntp_servers()
 
 
-void print_time(time_t offset) {
+void print_time(time_t offset)
+{
     char buf[30];
     char *dstAbbrev;
     time_t t = dstAdjusted.time(&dstAbbrev)+offset;
@@ -105,7 +126,8 @@ void print_time(time_t offset) {
 }   // * end print_time()
 
 
-void update_clock_display() {
+void update_clock_display()
+{
     char buf[30];
     char *dstAbbrev;
     time_t t = dstAdjusted.time(&dstAbbrev);
@@ -134,7 +156,8 @@ void update_clock_display() {
 // **********************************
 
 // * Gets called when WiFiManager enters configuration mode
-void configModeCallback(WiFiManager *myWiFiManager) {
+void configModeCallback(WiFiManager *myWiFiManager)
+{
     Serial.println(F("Entered config mode"));
     Serial.println(WiFi.softAPIP());
 
@@ -152,7 +175,8 @@ void configModeCallback(WiFiManager *myWiFiManager) {
 // **********************************
 
 // * Blink on-board Led
-void led_tick() {
+void led_tick()
+{
     // * Toggle state
     int state = digitalRead(BUILTIN_LED);    // * Get the current state of GPIO1 pin
     digitalWrite(BUILTIN_LED, !state);       // * Set pin to the opposite state
@@ -165,7 +189,8 @@ void led_tick() {
 // **********************************
 
 // * Callback for incoming MQTT messages
-void mqtt_callback(char* topic, byte* payload_in, unsigned int length) {
+void mqtt_callback(char* topic, byte* payload_in, unsigned int length)
+{
     // Empty until i need the clock to do something (like reset)
 
 }   // * end mqtt_callback()
@@ -230,7 +255,8 @@ void send_update_to_broker() {
 }
 
 // * Check if the button state changed and send to MQTT broker
-void button_loop() {
+void button_loop()
+{
     int reading = digitalRead(BUTTON_PIN);
 
     if (reading != last_button_state) {
@@ -252,7 +278,8 @@ void button_loop() {
 // * EEPROM helpers                 *
 // **********************************
 
-String read_eeprom(int offset, int len) {
+String read_eeprom(int offset, int len)
+{
     String res = "";
     for (int i = 0; i < len; ++i) {
         res += char(EEPROM.read(i + offset));
@@ -264,7 +291,8 @@ String read_eeprom(int offset, int len) {
 
 }   // * end read_eeprom()
 
-void write_eeprom(int offset, int len, String value) {
+void write_eeprom(int offset, int len, String value)
+{
 
     Serial.print(F("write_eeprom(): "));
     Serial.println(value.c_str());
@@ -288,7 +316,8 @@ void write_eeprom(int offset, int len, String value) {
 bool shouldSaveConfig = false;
 
 // * Callback notifying us of the need to save config
-void save_wifi_config_callback () {
+void save_wifi_config_callback ()
+{
     Serial.println(F("Should save config"));
     shouldSaveConfig = true;
 
@@ -299,7 +328,8 @@ void save_wifi_config_callback () {
 // * Setup OTA                      *
 // **********************************
 
-void setup_ota() {
+void setup_ota()
+{
     Serial.println(F("Arduino OTA activated."));
 
     // * Port defaults to 8266
@@ -346,7 +376,8 @@ void setup_ota() {
 // * Setup MDNS discovery service   *
 // **********************************
 
-void setup_mdns() {
+void setup_mdns()
+{
     Serial.println(F("Starting MDNS responder service"));
     bool mdns_result = MDNS.begin(HOSTNAME);
 
@@ -357,7 +388,14 @@ void setup_mdns() {
 // * Setup Main                     *
 // **********************************
 
-void setup(){
+void setup()
+{
+    // * Update watchdog value
+    last_loop = millis();
+
+    // * Initiate watchdog
+    tickerOSWatch.attach_ms(((OSWATCH_RESET_TIME / 3) * 1000), osWatch);
+
     // * Configure Serial and EEPROM
     Serial.begin(115200);
     EEPROM.begin(512);
@@ -473,7 +511,12 @@ void setup(){
 // * Loop                           *
 // **********************************
 
-void loop() {
+void loop()
+{
+    // * Update last loop
+    last_loop = millis();
+
+    // * Handle ota offers
     ArduinoOTA.handle();
 
     // * Maintain MQTT connection

@@ -32,6 +32,12 @@
 // * Wifi timeout in milliseconds
 #define WIFI_TIMEOUT 30000
 
+// * Watchdog settings
+#define OSWATCH_RESET_TIME 30
+
+// * Will be updated each loop
+static unsigned long last_loop;
+
 // * To be filled with EEPROM data
 char MQTT_HOST[64] = "";
 char MQTT_PORT[6]  = "";
@@ -51,7 +57,6 @@ long LAST_RECONNECT_ATTEMPT = 0;
 char ntp_server1[40] = "0.nl.pool.ntp.org";
 char ntp_server2[40] = "1.nl.pool.ntp.org";
 char ntp_server3[40] = "2.nl.pool.ntp.org";
-
 
 // * Update time from NTP server every 2 hours
 #define NTP_UPDATE_INTERVAL_SEC 2 * 3600
